@@ -12,7 +12,7 @@ from email.mime.image import MIMEImage
 import commands
 
 #发送邮件的基本函数，参数依次如下
-# smtp服务器地址、邮箱用户名，邮箱，发件人地址，手贱儿女地址（列表的方式），邮件主题，邮件html内容
+# smtp服务器地址、邮箱用户名，邮箱第三方密码，发件人地址，收件人地址（列表的方式），邮件主题，邮件html内容
 def sendEmail(smtpserver,username,password,sender,receiver,subject,msghtml):
     msgRoot = MIMEMultipart('related')
     msgRoot["To"] = ','.join(receiver)
@@ -26,13 +26,14 @@ def sendEmail(smtpserver,username,password,sender,receiver,subject,msghtml):
     smtp.login(username, password)
     smtp.sendmail(sender, receiver, msgRoot.as_string())
     smtp.quit()
+    print subject+" has been sent"
 
 # 检查网络连同性
 def check_network():
     while True:
         try:
             result=urllib.urlopen('http://baidu.com').read()
-            print result
+            # print result
             print "Network is Ready!"
             break
         except Exception , e:
@@ -55,9 +56,9 @@ def get_ip_address():
     ipaddr=str(ipaddr[1])
     content = hostname+" : "+ipaddr
     print content
-    return content
+    return hostname,content
 
 if __name__ == '__main__':
     check_network()
-    content=get_ip_address()
-    sendEmail('smtp.163.com','pi_raspberrypi@163.com','111qqq','pi_raspberrypi@163.com',['tianws@mapbar.com'],'IP Address Of Raspberry Pi',content)
+    hostname,content=get_ip_address()
+    sendEmail('smtp.163.com','pi_raspberrypi@163.com','111qqq','pi_raspberrypi@163.com',['tianws@mapbar.com','342415221@qq.com'],'IP Address Of '+hostname,content)
