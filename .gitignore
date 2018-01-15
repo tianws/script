@@ -1,0 +1,6 @@
+*.avi
+build
+cmake-build-debug
+.idea
+*.jpg
+*.png

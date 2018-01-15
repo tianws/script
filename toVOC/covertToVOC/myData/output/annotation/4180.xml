@@ -1,0 +1,32 @@
+<annotation>
+  <filename>4180.jpg</filename>
+  <size>
+    <width>1920</width>
+    <height>1080</height>
+    <depth>3</depth>
+  </size>
+  <object>
+    <name>sedan</name>
+    <pose>Unspecified</pose>
+    <truncated>Unspecified</truncated>
+    <difficult>0</difficult>
+    <bndbox>
+      <xmin>186</xmin>
+      <ymin>330</ymin>
+      <xmax>405</xmax>
+      <ymin>510</ymin>
+    </bndbox>
+  </object>
+  <object>
+    <name>sedan</name>
+    <pose>Unspecified</pose>
+    <truncated>Unspecified</truncated>
+    <difficult>0</difficult>
+    <bndbox>
+      <xmin>1311</xmin>
+      <ymin>300</ymin>
+      <xmax>1681</xmax>
+      <ymin>652</ymin>
+    </bndbox>
+  </object>
+</annotation>

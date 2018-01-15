@@ -1,0 +1,465 @@
+diff -Naur apps/traincascade/cascadeclassifier.cpp /mapbar/acgtyrant/Projects/opencv3_backup/apps/traincascade/cascadeclassifier.cpp
+--- apps/traincascade/cascadeclassifier.cpp	2015-12-18 23:02:16.000000000 +0800
++++ /mapbar/acgtyrant/Projects/opencv3_backup/apps/traincascade/cascadeclassifier.cpp	2016-07-16 15:05:56.055763105 +0800
+@@ -136,7 +136,8 @@
+                                 const CvFeatureParams& _featureParams,
+                                 const CvCascadeBoostParams& _stageParams,
+                                 bool baseFormatSave,
+-                                double acceptanceRatioBreakValue )
++                                double acceptanceRatioBreakValue,
++                                bool _random )
+ {
+     // Start recording clock ticks for training time output
+     const clock_t begin_time = clock();
+@@ -153,7 +154,7 @@
+     numPos = _numPos;
+     numNeg = _numNeg;
+     numStages = _numStages;
+-    if ( !imgReader.create( _posFilename, _negFilename, _cascadeParams.winSize ) )
++    if ( !imgReader.create( _posFilename, _negFilename, _cascadeParams.winSize, _random ) )
+     {
+         cout << "Image reader can not be created from -vec " << _posFilename
+                 << " and -bg " << _negFilename << "." << endl;
+diff -Naur apps/traincascade/cascadeclassifier.h /mapbar/acgtyrant/Projects/opencv3_backup/apps/traincascade/cascadeclassifier.h
+--- apps/traincascade/cascadeclassifier.h	2015-12-18 23:02:16.000000000 +0800
++++ /mapbar/acgtyrant/Projects/opencv3_backup/apps/traincascade/cascadeclassifier.h	2016-07-16 14:01:24.671726501 +0800
+@@ -95,7 +95,8 @@
+                 const CvFeatureParams& _featureParams,
+                 const CvCascadeBoostParams& _stageParams,
+                 bool baseFormatSave = false,
+-                double acceptanceRatioBreakValue = -1.0 );
++                double acceptanceRatioBreakValue = -1.0,
++                bool random = false );
+ private:
+     int predict( int sampleIdx );
+     void save( const std::string cascadeDirName, bool baseFormat = false );
+diff -Naur apps/traincascade/imagestorage.cpp /mapbar/acgtyrant/Projects/opencv3_backup/apps/traincascade/imagestorage.cpp
+--- apps/traincascade/imagestorage.cpp	2015-12-18 23:02:16.000000000 +0800
++++ /mapbar/acgtyrant/Projects/opencv3_backup/apps/traincascade/imagestorage.cpp	2016-07-16 17:39:31.067850233 +0800
+@@ -4,16 +4,20 @@
+ #include "opencv2/imgcodecs.hpp"
+ 
+ #include "imagestorage.h"
++#include <cstdlib>
+ #include <stdio.h>
++#include <algorithm>
++#include <cassert>
+ #include <iostream>
+ #include <fstream>
++#include <sstream>
+ 
+ using namespace std;
+ using namespace cv;
+ 
+-bool CvCascadeImageReader::create( const string _posFilename, const string _negFilename, Size _winSize )
++bool CvCascadeImageReader::create( const string _posFilename, const string _negFilename, Size _winSize, bool _random )
+ {
+-    return posReader.create(_posFilename) && negReader.create(_negFilename, _winSize);
++    return posReader.create(_posFilename) && negReader.create(_negFilename, _winSize, _random);
+ }
+ 
+ CvCascadeImageReader::NegReader::NegReader()
+@@ -21,103 +25,246 @@
+     src.create( 0, 0 , CV_8UC1 );
+     img.create( 0, 0, CV_8UC1 );
+     point = offset = Point( 0, 0 );
++    round = 0;
+     scale       = 1.0F;
+     scaleFactor = 1.4142135623730950488016887242097F;
+     stepFactor  = 0.5F;
+ }
+ 
+-bool CvCascadeImageReader::NegReader::create( const string _filename, Size _winSize )
++void CvCascadeImageReader::NegReader::Parse(
++        const std::string line,
++        const std::string dirname) {
++    std::istringstream line_stream(line);
++    std::string filename;
++    line_stream >> filename;
++    imgFilenames.push_back(dirname + filename);
++    std::string number_string;
++    line_stream >> number_string;
++    std::vector<std::string> rect_strings;
++    std::string rect_string;
++    while (line_stream >> rect_string) {
++        rect_strings.push_back(rect_string);
++    }
++    assert(std::atoi(number_string.c_str()) == int(rect_strings.size()));
++    for (std::size_t i = 0; i < rect_strings.size(); i += 4) {
++        labels[dirname + filename].push_back(cv::Rect(
++                std::atoi(rect_strings[i].c_str()),
++                std::atoi(rect_strings[i + 1].c_str()),
++                std::atoi(rect_strings[i + 2].c_str()),
++                std::atoi(rect_strings[i + 3].c_str())));
++    }
++}
++
++bool CvCascadeImageReader::NegReader::create( const string _filename, Size _winSize, bool _random )
+ {
+-    string dirname, str;
++    string dirname, fuckopencv_line;
+     std::ifstream file(_filename.c_str());
+     if ( !file.is_open() )
+         return false;
+ 
+-    while( !file.eof() )
+-    {
+-        std::getline(file, str);
+-        if (str.empty()) break;
+-        if (str.at(0) == '#' ) continue; /* comment */
+-        imgFilenames.push_back(str);
++    size_t pos = _filename.rfind('\\');
++    char dlmrt = '\\';
++    if (pos == string::npos) {
++        pos = _filename.rfind('/');
++        dlmrt = '/';
++    }
++    dirname = pos == string::npos ? "" : _filename.substr(0, pos) + dlmrt;
++    while( !file.eof() ) {
++        std::getline(file, fuckopencv_line);
++        if (fuckopencv_line.empty()) break;
++        if (fuckopencv_line.at(0) == '#' ) continue; /* comment */
++        Parse(fuckopencv_line, dirname);
+     }
+     file.close();
+ 
+     winSize = _winSize;
+-    last = round = 0;
++    random = _random;
++    if (!imgFilenames.empty()) {
++        if (random) {
++            filename_index = std::rand() % imgFilenames.size();
++        } else {
++            filename_index = 0;
++        }
++        UpdateFile(filename_index);
++    } else {
++        return false;
++    }
+     return true;
+ }
+ 
+-bool CvCascadeImageReader::NegReader::nextImg()
+-{
+-    Point _offset = Point(0,0);
+-    size_t count = imgFilenames.size();
+-    for( size_t i = 0; i < count; i++ )
+-    {
+-        src = imread( imgFilenames[last++], 0 );
+-        if( src.empty() ){
+-            last %= count;
+-            continue;
+-        }
+-        round += last / count;
+-        round = round % (winSize.width * winSize.height);
+-        last %= count;
+-
+-        _offset.x = std::min( (int)round % winSize.width, src.cols - winSize.width );
+-        _offset.y = std::min( (int)round / winSize.width, src.rows - winSize.height );
+-        if( !src.empty() && src.type() == CV_8UC1
+-                && _offset.x >= 0 && _offset.y >= 0 )
+-            break;
+-    }
+-
+-    if( src.empty() )
+-        return false; // no appropriate image
+-    point = offset = _offset;
+-    scale = max( ((float)winSize.width + point.x) / ((float)src.cols),
+-                 ((float)winSize.height + point.y) / ((float)src.rows) );
++inline int CvCascadeImageReader::NegReader::NewPointX() const {
++    return (int)(point.x + stepFactor * winSize.width);
++}
+ 
+-    Size sz( (int)(scale*src.cols + 0.5F), (int)(scale*src.rows + 0.5F) );
+-    resize( src, img, sz );
++inline int CvCascadeImageReader::NegReader::NewPointY() const {
++    return (int)(point.y + stepFactor * winSize.height);
++}
++
++bool CvCascadeImageReader::NegReader::IsScanValid() const {
++    cv::Rect left_rect(
++            point.x, point.y,
++            winSize.width, winSize.height);
++    if (labels.find(imgFilenames[filename_index]) == labels.end()) {
++        return true;
++    }
++    std::vector<cv::Rect> right_rects = labels.at(imgFilenames[filename_index]);
++    for (std::size_t i = 0; i < right_rects.size(); ++i) {
++        cv::Rect right_rect(
++                int(right_rects[i].x * scale + 0.5F),
++                int(right_rects[i].y * scale + 0.5F),
++                int(right_rects[i].width * scale + 0.5F),
++                int(right_rects[i].height * scale + 0.5F));
++        cv::Rect overlap_rect = left_rect & right_rect;
++        double union_rect_area = left_rect.area() + right_rect.area() - overlap_rect.area();
++		double overlap_rate = 1.0 * overlap_rect.area() / union_rect_area;
++		double critical_rate = 0.5;
++        if (overlap_rate > critical_rate) {
++            return false;
++        }
++    }
+     return true;
+ }
+ 
+-bool CvCascadeImageReader::NegReader::get( Mat& _img )
+-{
+-    CV_Assert( !_img.empty() );
+-    CV_Assert( _img.type() == CV_8UC1 );
+-    CV_Assert( _img.cols == winSize.width );
+-    CV_Assert( _img.rows == winSize.height );
++bool CvCascadeImageReader::NegReader::ScanScale(
++        const cv::Point _offset,
++        const float _scale) {
++    if (!IsScanValid()) {
++        return false;
++    }
++    while (
++            NewPointX() + winSize.width < img.cols ||
++            NewPointY() + winSize.height < img.rows) {
++        if (int(NewPointX() + winSize.width) < img.cols) {
++            point.x = NewPointX();
++            return true;
++        } else {
++            point.x = _offset.x;
++            point.y = NewPointY();
++            if (point.x + winSize.width < img.cols &&
++                    point.y + winSize.height < img.rows) {
++                return true;
++            }
++         }
++     }
++    return false;
++}
+ 
+-    if( img.empty() )
+-        if ( !nextImg() )
+-            return false;
++void CvCascadeImageReader::NegReader::UpdateScale(
++        const cv::Mat &_src,
++        const cv::Point _offset,
++        const float _scale) {
++    cv::Size sz(
++            (int)(_scale * _src.cols + 0.5F),
++            (int)(_scale * _src.rows + 0.5F));
++    cv::resize(_src, img, sz);
++    point = cv::Point(_offset.x - stepFactor * winSize.width, _offset.y);
++}
+ 
+-    Mat mat( winSize.height, winSize.width, CV_8UC1,
+-        (void*)(img.ptr(point.y) + point.x * img.elemSize()), img.step );
+-    mat.copyTo(_img);
+-
+-    if( (int)( point.x + (1.0F + stepFactor ) * winSize.width ) < img.cols )
+-        point.x += (int)(stepFactor * winSize.width);
+-    else
+-    {
+-        point.x = offset.x;
+-        if( (int)( point.y + (1.0F + stepFactor ) * winSize.height ) < img.rows )
+-            point.y += (int)(stepFactor * winSize.height);
+-        else
+-        {
+-            point.y = offset.y;
+-            scale *= scaleFactor;
+-            if( scale <= 1.0F )
+-                resize( src, img, Size( (int)(scale*src.cols), (int)(scale*src.rows) ) );
+-            else
+-            {
+-                if ( !nextImg() )
+-                    return false;
++bool CvCascadeImageReader::NegReader::ScanOffset(
++        const cv::Mat &_src,
++        const cv::Point _offset) {
++    while (scale < 1.0F) {
++        if (ScanScale(_offset, scale)) {
++            return true;
++        } else {
++            if (random) {
++                return false;
++            } else {
++                scale *= scaleFactor;
++                if (scale < 1.0F) {
++                    UpdateScale(_src, _offset, scale);
++                }
+             }
+         }
+     }
+-    return true;
++    return false;
++ }
++ 
++void CvCascadeImageReader::NegReader::UpdateRound(
++        const cv::Mat &_src,
++        const std::size_t _round) {
++    offset.x = std::min(
++            int(_round % winSize.width),
++            _src.cols - winSize.width);
++    offset.y = std::min(
++            int(_round / winSize.width),
++            _src.rows - winSize.height);
++    double floor = std::max(
++            ((float)winSize.width + offset.x) / ((float)_src.cols),
++            ((float)winSize.height + offset.y) / ((float)_src.rows));
++    if (random) {
++        do {
++            scale = 1.0 * std::rand() / RAND_MAX;
++        } while (scale < floor);
++    } else {
++        scale = floor;
++    }
++    UpdateScale(_src, offset, scale);
+ }
+ 
++bool CvCascadeImageReader::NegReader::ScanSrc(
++        const cv::Mat &_src) {
++    while (round < std::size_t(winSize.width * winSize.height)) {
++        if (offset.x >= 0 &&
++                offset.y >= 0 &&
++                ScanOffset(_src, offset)) {
++            return true;
++        } else {
++            if (random) {
++                return false;
++            } else {
++                ++round;
++                if (round < std::size_t(winSize.width * winSize.height)) {
++                    UpdateRound(_src, round);
++                }
++            }
++        }
++    }
++    return false;
++}
++
++void CvCascadeImageReader::NegReader::UpdateFile(
++        const std::size_t _filename_index) {
++    src = cv::imread(imgFilenames[_filename_index], 0);
++    if (random) {
++        round = std::rand() % (winSize.width * winSize.height);
++    } else {
++        round = 0;
++    }
++    UpdateRound(src, round);
++}
++
++bool CvCascadeImageReader::NegReader::get(Mat& _img) {
++     CV_Assert( !_img.empty() );
++     CV_Assert( _img.type() == CV_8UC1 );
++     CV_Assert( _img.cols == winSize.width );
++     CV_Assert( _img.rows == winSize.height );
++ 
++    while (filename_index < imgFilenames.size()) {
++        if (!src.empty() && ScanSrc(src)) {
++            cv::Mat mat(
++                    winSize.height,
++                    winSize.width,
++                    CV_8UC1,
++                    (void *)(img.data + point.y * img.step + point.x * img.elemSize()),
++                    img.step);
++            mat.copyTo(_img);
++            return true;
++        } else {
++            if (random) {
++                filename_index = std::rand() % imgFilenames.size();
++                UpdateFile(filename_index);
++            } else {
++                ++filename_index;
++                if (filename_index < imgFilenames.size()) {
++                    UpdateFile(filename_index);
++                }
++             }
++         }
++     }
++    return false;
++ }
++
+ CvCascadeImageReader::PosReader::PosReader()
+ {
+     file = 0;
+diff -Naur apps/traincascade/imagestorage.h /mapbar/acgtyrant/Projects/opencv3_backup/apps/traincascade/imagestorage.h
+--- apps/traincascade/imagestorage.h	2015-12-18 23:02:16.000000000 +0800
++++ /mapbar/acgtyrant/Projects/opencv3_backup/apps/traincascade/imagestorage.h	2016-07-16 17:08:57.599832897 +0800
+@@ -1,11 +1,12 @@
+ #ifndef _OPENCV_IMAGESTORAGE_H_
+ #define _OPENCV_IMAGESTORAGE_H_
+ 
++#include <map>
+ 
+ class CvCascadeImageReader
+ {
+ public:
+-    bool create( const std::string _posFilename, const std::string _negFilename, cv::Size _winSize );
++    bool create( const std::string _posFilename, const std::string _negFilename, cv::Size _winSize, bool _random );
+     void restart() { posReader.restart(); }
+     bool getNeg(cv::Mat &_img) { return negReader.get( _img ); }
+     bool getPos(cv::Mat &_img) { return posReader.get( _img ); }
+@@ -32,7 +33,17 @@
+     {
+     public:
+         NegReader();
+-        bool create( const std::string _filename, cv::Size _winSize );
++        void Parse( const std::string line, std::string dirname );
++        bool create( const std::string _filename, cv::Size _winSize, bool _random );
++        bool IsScanValid() const;
++        int NewPointX() const;
++        int NewPointY() const;
++        bool ScanScale( const cv::Point _offset, const float _scale );
++        void UpdateScale( const cv::Mat &_src, const cv::Point _offset, const float _scale );
++        bool ScanOffset( const cv::Mat &_src, const cv::Point _offset );
++        void UpdateRound(const cv::Mat &_src, const std::size_t _round );
++        bool ScanSrc( const cv::Mat &_src );
++        void UpdateFile( const std::size_t _filename_index );
+         bool get( cv::Mat& _img );
+         bool nextImg();
+ 
+@@ -42,8 +53,11 @@
+         float   scale;
+         float   scaleFactor;
+         float   stepFactor;
+-        size_t  last, round;
+         cv::Size    winSize;
++        std::map<std::string, std::vector<cv::Rect> > labels;
++        std::size_t filename_index;
++        std::size_t round;
++        bool random;
+     } negReader;
+ };
+ 
+diff -Naur apps/traincascade/traincascade.cpp /mapbar/acgtyrant/Projects/opencv3_backup/apps/traincascade/traincascade.cpp
+--- apps/traincascade/traincascade.cpp	2015-12-18 23:02:16.000000000 +0800
++++ /mapbar/acgtyrant/Projects/opencv3_backup/apps/traincascade/traincascade.cpp	2016-07-16 14:23:15.675738897 +0800
+@@ -16,6 +16,7 @@
+         precalcIdxBufSize = 1024;
+     bool baseFormatSave = false;
+     double acceptanceRatioBreakValue = -1.0;
++    bool random = false;
+ 
+     CvCascadeParams cascadeParams;
+     CvCascadeBoostParams stageParams;
+@@ -38,6 +39,7 @@
+         cout << "  [-baseFormatSave]" << endl;
+         cout << "  [-numThreads <max_number_of_threads = " << numThreads << ">]" << endl;
+         cout << "  [-acceptanceRatioBreakValue <value> = " << acceptanceRatioBreakValue << ">]" << endl;
++        cout << "  [-random]" << endl;
+         cascadeParams.printDefaults();
+         stageParams.printDefaults();
+         for( int fi = 0; fi < fc; fi++ )
+@@ -92,6 +94,10 @@
+         {
+           acceptanceRatioBreakValue = atof(argv[++i]);
+         }
++        else if( !strcmp( argv[i], "-random" ) )
++        {
++            random = true;
++        }
+         else if ( cascadeParams.scanAttr( argv[i], argv[i+1] ) ) { i++; }
+         else if ( stageParams.scanAttr( argv[i], argv[i+1] ) ) { i++; }
+         else if ( !set )
+@@ -119,6 +125,7 @@
+                       *featureParams[cascadeParams.featureType],
+                       stageParams,
+                       baseFormatSave,
+-                      acceptanceRatioBreakValue );
++                      acceptanceRatioBreakValue,
++                      random );
+     return 0;
+ }

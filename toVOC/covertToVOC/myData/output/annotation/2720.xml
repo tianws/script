@@ -1,0 +1,20 @@
+<annotation>
+  <filename>2720.jpg</filename>
+  <size>
+    <width>1920</width>
+    <height>1080</height>
+    <depth>3</depth>
+  </size>
+  <object>
+    <name>sedan</name>
+    <pose>Unspecified</pose>
+    <truncated>Unspecified</truncated>
+    <difficult>0</difficult>
+    <bndbox>
+      <xmin>651</xmin>
+      <ymin>333</ymin>
+      <xmax>819</xmax>
+      <ymin>463</ymin>
+    </bndbox>
+  </object>
+</annotation>

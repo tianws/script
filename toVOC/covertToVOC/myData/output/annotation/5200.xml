@@ -1,0 +1,32 @@
+<annotation>
+  <filename>5200.jpg</filename>
+  <size>
+    <width>1920</width>
+    <height>1080</height>
+    <depth>3</depth>
+  </size>
+  <object>
+    <name>sedan</name>
+    <pose>Unspecified</pose>
+    <truncated>Unspecified</truncated>
+    <difficult>0</difficult>
+    <bndbox>
+      <xmin>869</xmin>
+      <ymin>336</ymin>
+      <xmax>926</xmax>
+      <ymin>389</ymin>
+    </bndbox>
+  </object>
+  <object>
+    <name>bus</name>
+    <pose>Unspecified</pose>
+    <truncated>Unspecified</truncated>
+    <difficult>0</difficult>
+    <bndbox>
+      <xmin>1255</xmin>
+      <ymin>3</ymin>
+      <xmax>1836</xmax>
+      <ymin>630</ymin>
+    </bndbox>
+  </object>
+</annotation>
