@@ -16,8 +16,8 @@ else:
     unicode = str
 assert Path
 
-srcPath = Path('myData/input')
-outputPath = Path('myData/output')
+srcPath = Path('landmarks/input')
+outputPath = Path('landmarks/output')
 
 srcImgPath = srcPath / 'images'
 srcAnoPath = srcPath / 'annotation'
@@ -118,7 +118,7 @@ def writeXML(frame_name, class_name, rect):
         bndbox_ymin.text = str(rect.y)
         bndbox_xmax = ET.SubElement(object_bndbox, "xmax")
         bndbox_xmax.text = str(rect.x + rect.width)
-        bndbox_ymin = ET.SubElement(object_bndbox, "ymin")
+        bndbox_ymin = ET.SubElement(object_bndbox, "ymax")
         bndbox_ymin.text = str(rect.y + rect.height)
 
         tree = ET.ElementTree(xml_root)
@@ -144,7 +144,7 @@ def writeXML(frame_name, class_name, rect):
         bndbox_ymin.text = str(rect.y)
         bndbox_xmax = ET.SubElement(object_bndbox, "xmax")
         bndbox_xmax.text = str(rect.x + rect.width)
-        bndbox_ymin = ET.SubElement(object_bndbox, "ymin")
+        bndbox_ymin = ET.SubElement(object_bndbox, "ymax")
         bndbox_ymin.text = str(rect.y + rect.height)
         xml_root.append(new_object)
         updateTree.write(str(VOC_label_files_path),pretty_print=True)
